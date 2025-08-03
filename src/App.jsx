@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
+import './App.css';
+
 import OperatorInfo from './components/OperatorInfo';
 import EvaluationTable from './components/EvaluationTable';
 import Summary from './components/Summary';
 
 import { auth, db, signInAnonymously } from './firebaseConfig';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
+
 
 function App() {
   const [operator, setOperator] = useState({
@@ -21,8 +24,8 @@ function App() {
   ]);
 
   const [message, setMessage] = useState('');
+  const [evaluations, setEvaluations] = useState([]);
 
-  // Autenticação anônima no Firebase
   useEffect(() => {
     signInAnonymously(auth).catch(error => {
       console.error('Erro ao autenticar:', error);
@@ -30,7 +33,6 @@ function App() {
     });
   }, []);
 
-  // Função para salvar avaliação
   async function saveEvaluation() {
     if (!operator.name || !operator.date) {
       setMessage('Preencha nome do operador e data da auditoria.');
@@ -50,18 +52,35 @@ function App() {
     }
   }
 
-  // Função para buscar avaliações (aqui você pode criar botão ou usar useEffect para buscar ao carregar)
   async function loadEvaluations() {
     try {
       const querySnapshot = await getDocs(collection(db, 'evaluations'));
+      const results = [];
       querySnapshot.forEach(doc => {
-        console.log(doc.id, '=>', doc.data());
+        results.push({ id: doc.id, ...doc.data() });
       });
-      setMessage('Avaliações carregadas no console.');
+      setEvaluations(results);
+      setMessage('Avaliações carregadas com sucesso!');
     } catch (error) {
       console.error('Erro ao buscar avaliações:', error);
       setMessage('Erro ao buscar avaliações.');
     }
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
+  // Função para adicionar novo critério na tabela
+  function addCriteria() {
+    const newCriteria = {
+      category: '4 - Atendimento',
+      criteria: 'Empatia',
+      penalty: -1,
+      count: 0,
+    };
+    setTableData(prevData => [...prevData, newCriteria]);
+    setMessage('Novo critério adicionado!');
   }
 
   return (
@@ -75,9 +94,41 @@ function App() {
       <Summary tableData={tableData} />
 
       <button onClick={saveEvaluation}>Salvar Avaliação</button>
-      <button onClick={loadEvaluations}>Buscar Avaliações (Console)</button>
+      <button onClick={loadEvaluations}>Buscar Avaliações</button>
+      <button onClick={handlePrint}>🖨️ Imprimir Relatório</button>
+      <button onClick={addCriteria}>Adicionar Novo Critério</button>
 
       {message && <p>{message}</p>}
+
+      {evaluations.length > 0 && (
+        <div style={{ marginTop: '20px' }}>
+          <h2>Avaliações Carregadas:</h2>
+          {evaluations.map(ev => (
+            <div
+              key={ev.id}
+              style={{
+                marginBottom: '15px',
+                border: '1px solid #ccc',
+                padding: '10px',
+                borderRadius: '5px',
+                backgroundColor: '#f9f9f9',
+              }}
+            >
+              <p><strong>Operador:</strong> {ev.operator?.name || '—'}</p>
+              <p><strong>Data:</strong> {ev.operator?.date || '—'}</p>
+              <p><strong>Total de chamadas:</strong> {ev.operator?.calls || '—'}</p>
+              <p><strong>Detalhes da avaliação:</strong></p>
+              <ul>
+                {ev.tableData && ev.tableData.map((item, idx) => (
+                  <li key={idx}>
+                    Categoria: {item.category} — Critério: {item.criteria} — Penalidade: {item.penalty} — Contagem: {item.count}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
